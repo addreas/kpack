@@ -18,9 +18,11 @@ import (
 	"knative.dev/pkg/webhook"
 	"knative.dev/pkg/webhook/certificates"
 	"knative.dev/pkg/webhook/resourcesemantics"
+	"knative.dev/pkg/webhook/resourcesemantics/conversion"
 	"knative.dev/pkg/webhook/resourcesemantics/defaulting"
 	"knative.dev/pkg/webhook/resourcesemantics/validation"
 
+	"github.com/pivotal/kpack/pkg/apis/build/v1alpha1"
 	buildapi "github.com/pivotal/kpack/pkg/apis/build/v1alpha2"
 )
 
@@ -49,6 +51,7 @@ func main() {
 		certificates.NewController,
 		defaultingAdmissionController,
 		validatingAdmissionController,
+		conversionController,
 	)
 }
 
@@ -87,6 +90,41 @@ func validatingAdmissionController(ctx context.Context, _ configmap.Watcher) *co
 		},
 		// Whether to disallow unknown fields.
 		true,
+	)
+}
+
+func conversionController(ctx context.Context, _ configmap.Watcher) *controller.Impl {
+
+	conversions := map[schema.GroupKind]conversion.GroupKindConversion{
+		buildapi.Kind("Image"): {
+			DefinitionName: "images.kpack.io",
+			HubVersion:     buildapi.SchemeGroupVersion.Version,
+			Zygotes: map[string]conversion.ConvertibleObject{
+				buildapi.SchemeGroupVersion.Version: &buildapi.Image{},
+				v1alpha1.SchemeGroupVersion.Version: &v1alpha1.Image{},
+			},
+		},
+		//buildapi.SchemeGroupVersion.WithKind("Build").GroupKind():          {},
+		//buildapi.SchemeGroupVersion.WithKind("Builder").GroupKind():        {},
+		//buildapi.SchemeGroupVersion.WithKind("ClusterBuilder").GroupKind(): {},
+		buildapi.SchemeGroupVersion.WithKind("ClusterStore").GroupKind():   {
+			DefinitionName: "clusterstores.kpack.io",
+			HubVersion:     buildapi.SchemeGroupVersion.Version,
+			Zygotes: map[string]conversion.ConvertibleObject{
+				buildapi.SchemeGroupVersion.Version: &buildapi.ClusterStore{},
+				v1alpha1.SchemeGroupVersion.Version: &v1alpha1.ClusterStore{},
+			},
+		},
+		//buildapi.SchemeGroupVersion.WithKind("ClusterStack").GroupKind():   {},
+	}
+
+	return conversion.NewConversionController(
+		ctx,
+		"/convert",
+		conversions,
+		func(ctx context.Context) context.Context {
+			return ctx
+		},
 	)
 }
 

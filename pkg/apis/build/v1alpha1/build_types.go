@@ -17,6 +17,9 @@
 package v1alpha1
 
 import (
+	"context"
+
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/apis"
@@ -55,11 +58,11 @@ type BuildBuilderSpec struct {
 // +k8s:openapi-gen=true
 type BuildSpec struct {
 	// +listType
-	Tags           []string         `json:"tags,omitempty"`
-	Builder        BuildBuilderSpec `json:"builder,omitempty"`
-	ServiceAccount string           `json:"serviceAccount,omitempty"`
-	Source         SourceConfig     `json:"source"`
-	CacheName      string           `json:"cacheName,omitempty"`
+	Tags           []string                  `json:"tags,omitempty"`
+	Builder        BuildBuilderSpec          `json:"builder,omitempty"`
+	ServiceAccount string                    `json:"serviceAccount,omitempty"`
+	Source         corev1alpha1.SourceConfig `json:"source"`
+	CacheName      string                    `json:"cacheName,omitempty"`
 	// +listType
 	Bindings Bindings `json:"bindings,omitempty"`
 	// +listType
@@ -94,10 +97,10 @@ type BuildStack struct {
 // +k8s:openapi-gen=true
 type BuildStatus struct {
 	corev1alpha1.Status `json:",inline"`
-	BuildMetadata       BuildpackMetadataList `json:"buildMetadata,omitempty"`
-	Stack               BuildStack            `json:"stack,omitempty"`
-	LatestImage         string                `json:"latestImage,omitempty"`
-	PodName             string                `json:"podName,omitempty"`
+	BuildMetadata       corev1alpha1.BuildpackMetadataList `json:"buildMetadata,omitempty"`
+	Stack               BuildStack                         `json:"stack,omitempty"`
+	LatestImage         string                             `json:"latestImage,omitempty"`
+	PodName             string                             `json:"podName,omitempty"`
 	// +listType
 	StepStates []corev1.ContainerState `json:"stepStates,omitempty"`
 	// +listType
@@ -112,4 +115,13 @@ type BuildList struct {
 
 	// +k8s:listType=atomic
 	Items []Build `json:"items"`
+}
+
+
+func (*Build) ConvertTo(ctx context.Context, to apis.Convertible) error {
+	return errors.New("called convertTo in v1alpha1")
+}
+
+func (*Build) ConvertFrom(ctx context.Context, from apis.Convertible) error {
+	return errors.New("called convertFrom in v1alpha1")
 }

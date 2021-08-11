@@ -11,8 +11,8 @@ import (
 type BuilderRecord struct {
 	Image                   string
 	Stack                   BuildStack
-	Buildpacks              BuildpackMetadataList
-	Order                   []OrderEntry
+	Buildpacks              corev1alpha1.BuildpackMetadataList
+	Order                   []corev1alpha1.OrderEntry
 	ObservedStoreGeneration int64
 	ObservedStackGeneration int64
 	OS                      string

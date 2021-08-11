@@ -13,6 +13,7 @@ import (
 	"knative.dev/pkg/kmeta"
 
 	buildapi "github.com/pivotal/kpack/pkg/apis/build/v1alpha2"
+	corev1alpha1 "github.com/pivotal/kpack/pkg/apis/core/v1alpha1"
 )
 
 func TestBuildPod(t *testing.T) {
@@ -61,8 +62,8 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			Tags:           []string{"someimage/name", "someimage/name:tag2", "someimage/name:tag3"},
 			Builder:        builderImageRef,
 			ServiceAccount: serviceAccount,
-			Source: buildapi.SourceConfig{
-				Git: &buildapi.Git{
+			Source: corev1alpha1.SourceConfig{
+				Git: &corev1alpha1.Git{
 					URL:      "giturl.com/git.git",
 					Revision: "gitrev1234",
 				},
@@ -423,7 +424,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures prepare with the blob source", func() {
 			build.Spec.Source.Git = nil
-			build.Spec.Source.Blob = &buildapi.Blob{
+			build.Spec.Source.Blob = &corev1alpha1.Blob{
 				URL: "https://some-blobstore.example.com/some-blob",
 			}
 			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
@@ -441,7 +442,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		it("configures prepare with the registry source and empty imagePullSecrets when not provided", func() {
 			build.Spec.Source.Git = nil
 			build.Spec.Source.Blob = nil
-			build.Spec.Source.Registry = &buildapi.Registry{
+			build.Spec.Source.Registry = &corev1alpha1.Registry{
 				Image: "some-registry.io/some-image",
 			}
 			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
@@ -466,7 +467,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		it("configures prepare with the registry source and a secret volume when is imagePullSecrets provided", func() {
 			build.Spec.Source.Git = nil
 			build.Spec.Source.Blob = nil
-			build.Spec.Source.Registry = &buildapi.Registry{
+			build.Spec.Source.Registry = &corev1alpha1.Registry{
 				Image: "some-registry.io/some-image",
 				ImagePullSecrets: []corev1.LocalObjectReference{
 					{Name: "registry-secret"},

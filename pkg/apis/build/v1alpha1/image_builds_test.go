@@ -92,16 +92,16 @@ func testImageBuilds(t *testing.T, when spec.G, it spec.S) {
 	}
 
 	when("#build", func() {
-		sourceResolver.Status.Source = ResolvedSourceConfig{
-			Git: &ResolvedGitSource{
+		sourceResolver.Status.Source = corev1alpha1.ResolvedSourceConfig{
+			Git: &corev1alpha1.ResolvedGitSource{
 				URL:      "https://some.git/url",
 				Revision: "revision",
-				Type:     Commit,
+				Type:     corev1alpha1.Commit,
 			},
 		}
 
-		latestBuild.Spec.Source = SourceConfig{
-			Git: &Git{
+		latestBuild.Spec.Source = corev1alpha1.SourceConfig{
+			Git: &corev1alpha1.Git{
 				URL:      "https://some.git/url",
 				Revision: "revision",
 			},
@@ -143,8 +143,8 @@ func testImageBuilds(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("sets blob url when image source is blob", func() {
-			sourceResolver.Status.Source = ResolvedSourceConfig{
-				Blob: &ResolvedBlobSource{
+			sourceResolver.Status.Source = corev1alpha1.ResolvedSourceConfig{
+				Blob: &corev1alpha1.ResolvedBlobSource{
 					URL: "https://some.place/blob.jar",
 				},
 			}
@@ -155,8 +155,8 @@ func testImageBuilds(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("sets registry image when image source is registry", func() {
-			sourceResolver.Status.Source = ResolvedSourceConfig{
-				Registry: &ResolvedRegistrySource{
+			sourceResolver.Status.Source = corev1alpha1.ResolvedSourceConfig{
+				Registry: &corev1alpha1.ResolvedRegistrySource{
 					Image: "some-registry.io/some-image",
 				},
 			}

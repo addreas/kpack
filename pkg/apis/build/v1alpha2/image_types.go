@@ -43,7 +43,7 @@ type ImageSpec struct {
 	Tag                      string                 `json:"tag"`
 	Builder                  corev1.ObjectReference `json:"builder,omitempty"`
 	ServiceAccount           string                 `json:"serviceAccount,omitempty"`
-	Source                   SourceConfig           `json:"source"`
+	Source                   corev1alpha1.SourceConfig           `json:"source"`
 	CacheSize                *resource.Quantity     `json:"cacheSize,omitempty"`
 	FailedBuildHistoryLimit  *int64                 `json:"failedBuildHistoryLimit,omitempty"`
 	SuccessBuildHistoryLimit *int64                 `json:"successBuildHistoryLimit,omitempty"`
@@ -85,6 +85,7 @@ type ImageStatus struct {
 	BuildCacheName             string `json:"buildCacheName,omitempty"`
 	LatestBuildReason          string `json:"latestBuildReason,omitempty"`
 }
+
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
