@@ -143,7 +143,7 @@ func testBuildValidation(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("validates valid lastBuilt Image", func() {
-			build.Spec.LastBuild = &LastBuild{Image: "invalid@@"}
+			build.Spec.LastBuild = &corev1alpha1.LastBuild{Image: "invalid@@"}
 
 			assertValidationError(build, apis.ErrInvalidValue(build.Spec.LastBuild.Image, "image").ViaField("spec", "lastBuild"))
 		})

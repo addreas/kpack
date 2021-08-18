@@ -24,7 +24,7 @@ func TestRebaseable(t *testing.T) {
 
 	build = &Build{
 		Spec: BuildSpec{
-			LastBuild: &LastBuild{
+			LastBuild: &corev1alpha1.LastBuild{
 				Image:   "some/run",
 				StackId: "matching.stack",
 			},
@@ -39,7 +39,7 @@ func TestRebaseable(t *testing.T) {
 			},
 		},
 		Spec: BuildSpec{
-			LastBuild: &LastBuild{
+			LastBuild: &corev1alpha1.LastBuild{
 				Image:   "some/run",
 				StackId: "matching.stack",
 			},
