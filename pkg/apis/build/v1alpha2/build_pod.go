@@ -7,12 +7,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/go-containerregistry/pkg/name"
+	corev1alpha1 "github.com/pivotal/kpack/pkg/apis/core/v1alpha1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/kmeta"
-
-	corev1alpha1 "github.com/pivotal/kpack/pkg/apis/core/v1alpha1"
 )
 
 const (
@@ -213,7 +212,7 @@ func (b *Build) BuildPod(images BuildPodImages, secrets []corev1.Secret, taints 
 				step(corev1.Container{
 					Name:    "completion",
 					Image:   images.completion(config.OS),
-					Command: []string{"/cnb/process/web"},
+					Command: []string{fmt.Sprintf("/cnb/process/%s", b.DefaultProcess())},
 					Args: append(
 						[]string{
 							"-notary-v1-url=" + b.NotaryV1Config().URL,
@@ -410,11 +409,12 @@ func (b *Build) BuildPod(images BuildPodImages, secrets []corev1.Secret, taints 
 									return nil
 								case platformAPI.Equal(highestSupportedPlatformVersion):
 									return []string{
+										fmt.Sprintf("-process-type=%s", b.DefaultProcess()),
 										"-report=/var/report/report.toml",
 									}
 								default:
 									return []string{
-										"-process-type=web",
+										fmt.Sprintf("-process-type=%s", b.DefaultProcess()),
 										"-report=/var/report/report.toml",
 									}
 								}

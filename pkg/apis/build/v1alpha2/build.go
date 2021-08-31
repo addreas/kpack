@@ -141,6 +141,13 @@ func (b *Build) NotaryV1Config() *corev1alpha1.NotaryV1Config {
 	return b.Spec.Notary.V1
 }
 
+func (b *Build) DefaultProcess() string {
+	if b.Spec.DefaultProcess == "" {
+		return "web"
+	}
+	return b.Spec.DefaultProcess
+}
+
 func (b *Build) rebasable(builderStack string) bool {
 	return b.Spec.LastBuild != nil &&
 		b.Annotations[BuildReasonAnnotation] == BuildReasonStack && b.Spec.LastBuild.StackId == builderStack
