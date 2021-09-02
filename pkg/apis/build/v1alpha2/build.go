@@ -142,9 +142,10 @@ func (b *Build) NotaryV1Config() *corev1alpha1.NotaryV1Config {
 }
 
 func (b *Build) DefaultProcess() string {
-	if b.Spec.DefaultProcess == "" {
-		return "web"
+	if b == nil {
+		return ""
 	}
+
 	return b.Spec.DefaultProcess
 }
 

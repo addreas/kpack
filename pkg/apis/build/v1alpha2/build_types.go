@@ -59,7 +59,7 @@ type BuildSpec struct {
 	Resources             corev1.ResourceRequirements `json:"resources,omitempty"`
 	LastBuild             *LastBuild                  `json:"lastBuild,omitempty"`
 	Notary                *corev1alpha1.NotaryConfig  `json:"notary,omitempty"`
-	DefaultProcess        string
+	DefaultProcess        string                      `json:"DefaultProcess,omitempty"`
 }
 
 func (bs *BuildSpec) NeedVolumeCache() bool {
