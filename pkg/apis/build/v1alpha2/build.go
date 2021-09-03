@@ -135,17 +135,13 @@ func (b *Build) Finished() bool {
 }
 
 func (b *Build) NotaryV1Config() *corev1alpha1.NotaryV1Config {
-	if b == nil || b.Spec.Notary == nil {
+	if b.Spec.Notary == nil {
 		return nil
 	}
 	return b.Spec.Notary.V1
 }
 
 func (b *Build) DefaultProcess() string {
-	if b == nil {
-		return ""
-	}
-
 	return b.Spec.DefaultProcess
 }
 
