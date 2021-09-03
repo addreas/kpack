@@ -2,6 +2,8 @@ package v1alpha2
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 
 	"knative.dev/pkg/apis"
 	"knative.dev/pkg/kmp"
@@ -16,7 +18,8 @@ func (b *Build) SetDefaults(ctx context.Context) {
 }
 
 func (b *Build) Validate(ctx context.Context) *apis.FieldError {
-	return b.Spec.Validate(ctx).ViaField("spec")
+	return b.Spec.Validate(ctx).ViaField("spec").
+		Also(b.ValidateMetadata(ctx).ViaField("metadata"))
 }
 
 func (bs *BuildSpec) Validate(ctx context.Context) *apis.FieldError {
@@ -25,9 +28,20 @@ func (bs *BuildSpec) Validate(ctx context.Context) *apis.FieldError {
 		Also(bs.Cache.Validate(ctx).ViaField("cache")).
 		Also(bs.Builder.Validate(ctx).ViaField("builder")).
 		Also(bs.Source.Validate(ctx).ViaField("source")).
-		Also(bs.Bindings.Validate(ctx).ViaField("bindings")).
+		Also(bs.Services.Validate(ctx).ViaField("services")).
 		Also(bs.LastBuild.Validate(ctx).ViaField("lastBuild")).
 		Also(bs.validateImmutableFields(ctx))
+}
+
+func (b *Build) ValidateMetadata(ctx context.Context) *apis.FieldError {
+	return b.validateV1Alpha1Bindings().ViaField("annotations")
+}
+
+func (b *Build) validateV1Alpha1Bindings() *apis.FieldError {
+	if _, bindingsPresent := b.Annotations[V1Alpha1BindingsAnnotation]; bindingsPresent {
+		return apis.ErrInvalidKeyName(V1Alpha1BindingsAnnotation, apis.CurrentField)
+	}
+	return nil
 }
 
 func (bs *BuildSpec) validateImmutableFields(ctx context.Context) *apis.FieldError {
@@ -66,3 +80,33 @@ func (c *BuildCacheConfig) Validate(context context.Context) *apis.FieldError {
 	}
 	return nil
 }
+
+var serviceNameRE = regexp.MustCompile(`^[a-z0-9\-\.]{1,253}$`)
+func (ss Services) Validate(ctx context.Context) *apis.FieldError {
+	var errs *apis.FieldError
+	names := map[string]int{}
+	for i, s := range ss {
+		// check name uniqueness
+		if n, ok := names[s.Name]; ok {
+			errs = errs.Also(
+				apis.ErrGeneric(
+					fmt.Sprintf("duplicate service name %q", s.Name),
+					fmt.Sprintf("[%d].name", n),
+					fmt.Sprintf("[%d].name", i),
+				),
+			)
+		}
+		names[s.Name] = i
+		if s.Name == "" {
+			errs = errs.Also(apis.ErrMissingField("name").ViaIndex(i))
+		} else if !serviceNameRE.MatchString(s.Name) {
+			errs = errs.Also(apis.ErrInvalidValue(s.Name, "name").ViaIndex(i))
+		}
+
+		if s.Kind == "" {
+			errs = errs.Also(apis.ErrMissingField("kind").ViaIndex(i))
+		}
+	}
+	return errs
+}
+

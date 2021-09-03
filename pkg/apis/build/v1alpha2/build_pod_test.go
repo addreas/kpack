@@ -14,6 +14,7 @@ import (
 
 	buildapi "github.com/pivotal/kpack/pkg/apis/build/v1alpha2"
 	corev1alpha1 "github.com/pivotal/kpack/pkg/apis/core/v1alpha1"
+	"github.com/pivotal/kpack/pkg/servicebinding"
 )
 
 func TestBuildPod(t *testing.T) {
@@ -54,7 +55,8 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 				"some/label": "to-pass-through",
 			},
 			Annotations: map[string]string{
-				"some/annotation": "to-pass-through",
+				"some/annotation":                   "to-pass-through",
+				buildapi.V1Alpha1BindingsAnnotation: `{"name": "v1alpha1servicebinding", "metadataRef": {"name": "some-config-map"}, "secretRef": {"name": "some-secret"}}`,
 			},
 		},
 		Spec: buildapi.BuildSpec{
@@ -72,21 +74,12 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 					ClaimName: "some-cache-name",
 				},
 			},
-			Bindings: []corev1alpha1.Binding{
+			Services: buildapi.Services{
 				{
 					Name: "database",
-					MetadataRef: &corev1.LocalObjectReference{
-						Name: "database-configmap",
-					},
 				},
 				{
 					Name: "apm",
-					MetadataRef: &corev1.LocalObjectReference{
-						Name: "apm-configmap",
-					},
-					SecretRef: &corev1.LocalObjectReference{
-						Name: "apm-secret",
-					},
 				},
 			},
 			Env: []corev1.EnvVar{
@@ -98,6 +91,26 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 				Image:   previousAppImage,
 				StackId: "com.builder.stack.io",
 			},
+		},
+	}
+
+	serviceBindings := []buildapi.ServiceBinding{
+		&servicebinding.ServiceBinding{
+			Name: "database",
+			SecretRef: &corev1.LocalObjectReference{
+				Name: "database",
+			},
+		},
+		&servicebinding.ServiceBinding{
+			Name: "apm",
+			SecretRef: &corev1.LocalObjectReference{
+				Name: "apm",
+			},
+		},
+		&servicebinding.V1Alpha1ServiceBinding{
+			Name:        "some-v1alpha1-secret",
+			SecretRef:   &corev1.LocalObjectReference{Name: "some-secret"},
+			MetadataRef: &corev1.LocalObjectReference{Name: "some-configmap"},
 		},
 	}
 
@@ -185,7 +198,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 
 	when("BuildPod", func() {
 		it("creates a pod with a builder owner reference and build labels and annotations", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.ObjectMeta, metav1.ObjectMeta{
@@ -205,21 +218,21 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("creates a pod with a correct service account", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, serviceAccount, pod.Spec.ServiceAccountName)
 		})
 
 		it("creates a pod with the correct node selector", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, map[string]string{"kubernetes.io/os": "linux"}, pod.Spec.NodeSelector)
 		})
 
 		it("configures the pod security context to match the builder config user and group", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, buildPodBuilderConfig.Uid, *pod.Spec.SecurityContext.RunAsUser)
@@ -228,7 +241,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("creates init containers with all the build steps", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			var names []string
@@ -249,7 +262,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		it("configures the workspace volume with a subPath", func() {
 			build.Spec.Source.SubPath = "some/path"
 
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			vol := volumeMountFromContainer(t, pod.Spec.InitContainers, "prepare", "workspace-dir")
@@ -264,7 +277,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures the bindings", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Contains(t,
@@ -322,7 +335,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures prepare with docker and git credentials", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[0].Name, "prepare")
@@ -361,7 +374,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures prepare with the build configuration", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[0].Name, "prepare")
@@ -407,7 +420,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures the prepare step for git source", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, "prepare", pod.Spec.InitContainers[0].Name)
@@ -430,7 +443,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			build.Spec.Source.Blob = &corev1alpha1.Blob{
 				URL: "https://some-blobstore.example.com/some-blob",
 			}
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, "prepare", pod.Spec.InitContainers[0].Name)
@@ -448,7 +461,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			build.Spec.Source.Registry = &corev1alpha1.Registry{
 				Image: "some-registry.io/some-image",
 			}
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, "prepare", pod.Spec.InitContainers[0].Name)
@@ -476,7 +489,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 					{Name: "registry-secret"},
 				},
 			}
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, "prepare", pod.Spec.InitContainers[0].Name)
@@ -506,7 +519,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures detect step", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[1].Name, "detect")
@@ -523,7 +536,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures analyze step", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[2].Name, "analyze")
@@ -547,7 +560,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		it("configures analyze step with the current tag if no previous build", func() {
 			build.Spec.LastBuild = nil
 
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[2].Name, "analyze")
@@ -570,14 +583,14 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		it("configures analyze step with the current tag if previous build is corrupted", func() {
 			build.Spec.LastBuild = &buildapi.LastBuild{}
 
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Contains(t, pod.Spec.InitContainers[2].Args, build.Tag())
 		})
 
 		it("configures restore step", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[3].Name, "restore")
@@ -597,7 +610,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures build step", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[4].Name, "build")
@@ -614,7 +627,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures export step", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, pod.Spec.InitContainers[5].Name, "export")
@@ -642,7 +655,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures the builder image in all lifecycle steps", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			for _, container := range pod.Spec.InitContainers {
@@ -653,7 +666,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("configures the completion container with resources", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			completionContainer := pod.Spec.Containers[0]
@@ -661,7 +674,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("creates a pod with reusable cache when name is provided", func() {
-			pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assert.Equal(t, corev1.Volume{
@@ -673,33 +686,33 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("registry cache is requested (first build)", func() {
-			podWithVolumeCache, _ := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+			podWithVolumeCache, _ := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 			build.Spec.Cache.Volume = nil
 			build.Spec.Cache.Registry = &buildapi.RegistryCache{Tag: "test-cache-image"}
 
 			it("creates a pod without cache volume", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Len(t, podWithImageCache.Spec.Volumes, len(podWithVolumeCache.Spec.Volumes)-1)
 			})
 
 			it("does not add the cache to analyze container", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				analyzeContainer := podWithImageCache.Spec.InitContainers[2]
 				assert.NotContains(t, analyzeContainer.Args, "-cache-image=test-cache-image")
 			})
 			it("does not add the cache to restore container", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				restoreContainer := podWithImageCache.Spec.InitContainers[3]
 				assert.NotContains(t, restoreContainer.Args, "-cache-image=test-cache-image")
 			})
 			it("adds the cache to export container", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				exportContainer := podWithImageCache.Spec.InitContainers[5]
@@ -708,7 +721,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("registry cache is requested (second build)", func() {
-			podWithVolumeCache, _ := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+			podWithVolumeCache, _ := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 			build.Spec.Cache.Volume = nil
 			build.Spec.Cache.Registry = &buildapi.RegistryCache{Tag: "test-cache-image"}
 			build.Spec.LastBuild = &buildapi.LastBuild{
@@ -718,28 +731,28 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			it("creates a pod without cache volume", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Len(t, podWithImageCache.Spec.Volumes, len(podWithVolumeCache.Spec.Volumes)-1)
 			})
 
 			it("adds the cache to analyze container", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				analyzeContainer := podWithImageCache.Spec.InitContainers[2]
 				assert.Contains(t, analyzeContainer.Args, "-cache-image=test-cache-image@sha")
 			})
 			it("adds the cache to restore container", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				restoreContainer := podWithImageCache.Spec.InitContainers[3]
 				assert.Contains(t, restoreContainer.Args, "-cache-image=test-cache-image@sha")
 			})
 			it("adds the cache to export container", func() {
-				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				podWithImageCache, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				exportContainer := podWithImageCache.Spec.InitContainers[5]
@@ -753,21 +766,21 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			build.Spec.Cache.Registry = &buildapi.RegistryCache{Tag: ""}
 
 			it("does not add the cache to analyze container", func() {
-				pod, err = build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err = build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				analyzeContainer := pod.Spec.InitContainers[2]
 				assert.NotContains(t, analyzeContainer.Args, "-cache-image")
 			})
 			it("does not add the cache to restore container", func() {
-				pod, err = build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err = build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				restoreContainer := pod.Spec.InitContainers[3]
 				assert.NotContains(t, restoreContainer.Args, "-cache-image")
 			})
 			it("does not add the cache to export container", func() {
-				pod, err = build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err = build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				exportContainer := pod.Spec.InitContainers[5]
@@ -777,11 +790,11 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 
 		when("Cache is nil", func() {
 			buildCopy := build.DeepCopy()
-			podWithCache, _ := buildCopy.BuildPod(config, nil, nil, buildPodBuilderConfig)
+			podWithCache, _ := buildCopy.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 			buildCopy.Spec.Cache = nil
 
 			it("creates a pod without cache volume", func() {
-				pod, err := buildCopy.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err := buildCopy.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Len(t, pod.Spec.Volumes, len(podWithCache.Spec.Volumes)-1)
@@ -789,18 +802,18 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("CacheName is empty", func() {
-			podWithCache, _ := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+			podWithCache, _ := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 			build.Spec.Cache.Volume = &buildapi.BuildPersistentVolumeCache{ClaimName: ""}
 
 			it("creates a pod without cache volume", func() {
-				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Len(t, pod.Spec.Volumes, len(podWithCache.Spec.Volumes)-1)
 			})
 
 			it("does not add the cache to analyze container", func() {
-				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				analyzeContainer := pod.Spec.InitContainers[2]
@@ -809,7 +822,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("does not add the cache to restore container", func() {
-				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				restoreContainer := pod.Spec.InitContainers[3]
@@ -818,7 +831,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("does not add the cache to exporter container", func() {
-				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				exportContainer := pod.Spec.InitContainers[5]
@@ -828,7 +841,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("attach volumes for secrets", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			assertSecretPresent(t, pod, "git-secret-1")
@@ -840,7 +853,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("attach image pull secrets to pod", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			require.Len(t, pod.Spec.ImagePullSecrets, 1)
@@ -848,7 +861,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("mounts volumes for bindings", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			require.Len(t, pod.Spec.ImagePullSecrets, 1)
@@ -859,7 +872,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			buildPodBuilderConfig.PlatformAPIs = []string{"0.3", "0.2"}
 
 			it("exports without a report and without default process type", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Contains(t, pod.Spec.InitContainers[5].Env, corev1.EnvVar{Name: "CNB_PLATFORM_API", Value: "0.3"})
@@ -881,7 +894,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			buildPodBuilderConfig.PlatformAPIs = []string{"0.2", "0.7"}
 
 			it("returns an error", func() {
-				_, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				_, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.EqualError(t, err, "unsupported builder platform API versions: 0.2,0.7")
 			})
 		})
@@ -894,7 +907,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			it("creates a pod just to rebase", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Equal(t, pod.ObjectMeta, metav1.ObjectMeta{
@@ -1024,7 +1037,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 						},
 					}
 
-					pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+					pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 					require.NoError(t, err)
 					require.Equal(t,
 						[]string{
@@ -1072,12 +1085,12 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			it("errs if platformApi does not support report.toml", func() {
 				buildPodBuilderConfig.PlatformAPIs = []string{"0.3", "0.2"}
 
-				_, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				_, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.EqualError(t, err, "unsupported builder platform API versions: 0.3,0.2")
 			})
 
 			it("sets up the completion image to sign the image", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Equal(t, "/cnb/process/web", pod.Spec.Containers[0].Command[0])
@@ -1115,7 +1128,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("creates the pod container correctly", func() {
-			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+			pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 			require.NoError(t, err)
 
 			require.Len(t, pod.Spec.Containers, 1)
@@ -1128,26 +1141,26 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			it("errs if platformApi does not support windows", func() {
 				buildPodBuilderConfig.PlatformAPIs = []string{"0.3", "0.2"}
 
-				_, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				_, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.EqualError(t, err, "unsupported builder platform API versions: 0.3,0.2")
 			})
 
 			it("uses windows node selector", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Equal(t, map[string]string{"kubernetes.io/os": "windows"}, pod.Spec.NodeSelector)
 			})
 
 			it("removes the spec securityContext", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Nil(t, pod.Spec.SecurityContext)
 			})
 
 			it("configures prepare for windows build init", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				prepareContainer := pod.Spec.InitContainers[0]
@@ -1180,7 +1193,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("configures detect step for windows", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				detectContainer := pod.Spec.InitContainers[1]
@@ -1211,7 +1224,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("configures analyze step", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				analyzeContainer := pod.Spec.InitContainers[2]
@@ -1249,7 +1262,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("configures restore step", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				restoreContainer := pod.Spec.InitContainers[3]
@@ -1279,7 +1292,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("configures build step", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				buildContainer := pod.Spec.InitContainers[4]
@@ -1311,7 +1324,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("configures export step", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				exportContainer := pod.Spec.InitContainers[5]
@@ -1356,7 +1369,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 					URL: "some-notary-server",
 				}}
 
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				completionContainer := pod.Spec.Containers[0]
@@ -1391,7 +1404,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("configures the completion container on windows", func() {
-				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, secrets, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				completionContainer := pod.Spec.Containers[0]
@@ -1403,10 +1416,10 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 			it("does not use cache on windows", func() {
 				buildPodBuilderConfigLinux := buildPodBuilderConfig.DeepCopy()
 				buildPodBuilderConfigLinux.OS = "linux"
-				podWithCache, _ := build.BuildPod(config, nil, nil, *buildPodBuilderConfigLinux)
+				podWithCache, _ := build.BuildPod(config, nil, nil, *buildPodBuilderConfigLinux, serviceBindings)
 				build.Spec.Cache.Volume.ClaimName = "non-empty"
 
-				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig)
+				pod, err := build.BuildPod(config, nil, nil, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Len(t, pod.Spec.Volumes, len(podWithCache.Spec.Volumes)-1)
@@ -1419,7 +1432,7 @@ func testBuildPod(t *testing.T, when spec.G, it spec.S) {
 						Value:  "test-value",
 						Effect: corev1.TaintEffectNoSchedule,
 					},
-				}, buildPodBuilderConfig)
+				}, buildPodBuilderConfig, serviceBindings)
 				require.NoError(t, err)
 
 				assert.Equal(t,

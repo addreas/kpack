@@ -49,7 +49,7 @@ type ImageSpec struct {
 	SuccessBuildHistoryLimit *int64                            `json:"successBuildHistoryLimit,omitempty"`
 	ImageTaggingStrategy     corev1alpha1.ImageTaggingStrategy `json:"imageTaggingStrategy,omitempty"`
 	ProjectDescriptorPath    string                            `json:"projectDescriptorPath,omitempty"`
-	Build                    *corev1alpha1.ImageBuild          `json:"build,omitempty"`
+	Build                    *ImageBuild                       `json:"build,omitempty"`
 	Notary                   *corev1alpha1.NotaryConfig        `json:"notary,omitempty"`
 }
 
@@ -96,6 +96,16 @@ type ImageList struct {
 
 	// +k8s:listType=atomic
 	Items []Image `json:"items"`
+}
+
+// +k8s:openapi-gen=true
+// +k8s:deepcopy-gen=true
+type ImageBuild struct {
+	// +listType
+	Services Services `json:"services,omitempty"`
+	// +listType
+	Env       []corev1.EnvVar             `json:"env,omitempty"`
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 func (*Image) GetGroupVersionKind() schema.GroupVersionKind {

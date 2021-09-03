@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	buildapi "github.com/pivotal/kpack/pkg/apis/build/v1alpha2"
 	corev1alpha1 "github.com/pivotal/kpack/pkg/apis/core/v1alpha1"
 	"github.com/pivotal/kpack/pkg/buildchange"
 	"github.com/pivotal/kpack/pkg/reconciler/testhelpers"
@@ -171,15 +172,9 @@ func testChangeProcessor(t *testing.T, when spec.G, it spec.S) {
 						Source: corev1alpha1.SourceConfig{
 							Blob: &corev1alpha1.Blob{URL: "some-blob-url"},
 						},
-						Bindings: []corev1alpha1.Binding{
+						Services: buildapi.Services{
 							{
-								Name: "binding-name",
-								MetadataRef: &corev1.LocalObjectReference{
-									Name: "some-metadata-ref",
-								},
-								SecretRef: &corev1.LocalObjectReference{
-									Name: "some-secret-ref",
-								},
+								Name: "some-secret-ref",
 							},
 						},
 					})
@@ -453,15 +448,9 @@ func testChangeProcessor(t *testing.T, when spec.G, it spec.S) {
 					Source: corev1alpha1.SourceConfig{
 						Blob: &corev1alpha1.Blob{URL: "some-blob-url"},
 					},
-					Bindings: []corev1alpha1.Binding{
+					Services: buildapi.Services{
 						{
-							Name: "binding-name",
-							MetadataRef: &corev1.LocalObjectReference{
-								Name: "some-metadata-ref",
-							},
-							SecretRef: &corev1.LocalObjectReference{
-								Name: "some-secret-ref",
-							},
+							Name: "some-secret-ref",
 						},
 					},
 				})

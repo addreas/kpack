@@ -63,7 +63,8 @@ func (i *Image) Validate(ctx context.Context) *apis.FieldError {
 }
 
 func (i *Image) ValidateMetadata(ctx context.Context) *apis.FieldError {
-	return i.validateName(i.Name).ViaField("name")
+	return i.validateName(i.Name).ViaField("name").
+		Also(i.validateV1Alpha1Bindings().ViaField("annotations"))
 }
 
 func (i *Image) validateName(imageName string) *apis.FieldError {
@@ -75,6 +76,13 @@ func (i *Image) validateName(imageName string) *apis.FieldError {
 			Details: strings.Join(msgs, ","),
 		}
 	}
+	return nil
+}
+
+func (i *Image) validateV1Alpha1Bindings() *apis.FieldError {
+	if _, bindingsPresent := i.Annotations[V1Alpha1BindingsAnnotation]; bindingsPresent {
+		return apis.ErrInvalidKeyName(V1Alpha1BindingsAnnotation, apis.CurrentField)
+	} 
 	return nil
 }
 
@@ -122,6 +130,14 @@ func (is *ImageSpec) validateVolumeCache(ctx context.Context) *apis.FieldError {
 	}
 
 	return nil
+}
+
+func (ib *ImageBuild) Validate(ctx context.Context) *apis.FieldError {
+	if ib == nil {
+		return nil
+	}
+
+	return ib.Services.Validate(ctx).ViaField("services")
 }
 
 func validateBuilder(builder v1.ObjectReference) *apis.FieldError {

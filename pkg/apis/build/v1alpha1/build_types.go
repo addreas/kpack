@@ -55,7 +55,7 @@ type BuildSpec struct {
 	Source         corev1alpha1.SourceConfig     `json:"source"`
 	CacheName      string                        `json:"cacheName,omitempty"`
 	// +listType
-	Bindings corev1alpha1.Bindings `json:"bindings,omitempty"`
+	Bindings Bindings `json:"bindings,omitempty"`
 	// +listType
 	Env       []corev1.EnvVar             `json:"env,omitempty"`
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -90,6 +90,18 @@ type BuildList struct {
 
 	// +k8s:listType=atomic
 	Items []Build `json:"items"`
+}
+
+// +k8s:openapi-gen=true
+// +k8s:deepcopy-gen=true
+type Bindings []Binding
+
+// +k8s:openapi-gen=true
+// +k8s:deepcopy-gen=true
+type Binding struct {
+	Name        string                       `json:"name,omitempty"`
+	MetadataRef *corev1.LocalObjectReference `json:"metadataRef,omitempty"`
+	SecretRef   *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 func (*Build) ConvertTo(_ context.Context, _ apis.Convertible) error {

@@ -2,6 +2,7 @@ package v1alpha2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"knative.dev/pkg/apis"
@@ -28,6 +29,18 @@ func (b *Build) ConvertFrom(_ context.Context, from apis.Convertible) error {
 		b.ObjectMeta = fromBuild.ObjectMeta
 		b.Spec.convertFrom(&fromBuild.Spec)
 		b.Status.convertFrom(&fromBuild.Status)
+		if bindings := fromBuild.Spec.Bindings; bindings != nil {
+			if b.Annotations == nil {
+				b.Annotations = map[string]string{}
+			}
+
+			bytes, err := json.Marshal(bindings)
+			if err != nil {
+				return err
+			}
+
+			b.Annotations[V1Alpha1BindingsAnnotation] = string(bytes)
+		}
 	default:
 		return fmt.Errorf("unknown version, got: %T", fromBuild)
 	}
@@ -46,7 +59,6 @@ func (bs *BuildSpec) convertTo(to *v1alpha1.BuildSpec) {
 			StackId: bs.LastBuild.StackId,
 		}
 	}
-	to.Bindings = bs.Bindings
 	to.ServiceAccount = bs.ServiceAccount
 	to.Builder = bs.Builder
 	to.Notary = bs.Notary
@@ -68,7 +80,6 @@ func (bs *BuildSpec) convertFrom(from *v1alpha1.BuildSpec) {
 			StackId: from.LastBuild.StackId,
 		}
 	}
-	bs.Bindings = from.Bindings
 	bs.ServiceAccount = from.ServiceAccount
 	bs.Builder = from.Builder
 	bs.Notary = from.Notary

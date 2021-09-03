@@ -66,7 +66,7 @@ func (im *Image) Build(sourceResolver *SourceResolver, builder BuilderResource, 
 	}
 }
 
-func lastBuild(latestBuild *Build) *corev1alpha1.LastBuild {
+func lastBuild(latestBuild *Build) *LastBuild {
 	if latestBuild == nil {
 		return nil
 	}
@@ -75,7 +75,7 @@ func lastBuild(latestBuild *Build) *corev1alpha1.LastBuild {
 		return latestBuild.Spec.LastBuild
 	}
 
-	return &corev1alpha1.LastBuild{
+	return &LastBuild{
 		Image:   latestBuild.BuiltImage(),
 		StackId: latestBuild.Stack(),
 	}
@@ -88,7 +88,7 @@ func (im *Image) LatestForImage(build *Build) string {
 	return im.Status.LatestImage
 }
 
-func (im *Image) Bindings() corev1alpha1.Bindings {
+func (im *Image) Bindings() Bindings {
 	if im.Spec.Build == nil {
 		return nil
 	}

@@ -143,73 +143,69 @@ func testBuildValidation(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("validates valid lastBuilt Image", func() {
-			build.Spec.LastBuild = &corev1alpha1.LastBuild{Image: "invalid@@"}
+			build.Spec.LastBuild = &LastBuild{Image: "invalid@@"}
 
 			assertValidationError(build, apis.ErrInvalidValue(build.Spec.LastBuild.Image, "image").ViaField("spec", "lastBuild"))
 		})
 
 		it("validates bindings have a name", func() {
-			build.Spec.Bindings = []corev1alpha1.Binding{
-				{MetadataRef: &corev1.LocalObjectReference{Name: "metadata"}},
+			build.Spec.Services = []corev1.ObjectReference {
+				{
+					Kind:            "Secret",
+				},
 			}
 
-			assertValidationError(build, apis.ErrMissingField("spec.bindings[0].name"))
+			assertValidationError(build, apis.ErrMissingField("spec.services[0].name"))
 		})
 
 		it("validates bindings have a valid name", func() {
-			build.Spec.Bindings = []corev1alpha1.Binding{
-				{Name: "&", MetadataRef: &corev1.LocalObjectReference{Name: "metadata"}},
-			}
-
-			assertValidationError(build, apis.ErrInvalidValue("&", "spec.bindings[0].name"))
-		})
-
-		it("validates bindings have metadata", func() {
-			build.Spec.Bindings = []corev1alpha1.Binding{
-				{Name: "apm"},
-			}
-
-			assertValidationError(build, apis.ErrMissingField("spec.bindings[0].metadataRef"))
-		})
-
-		it("validates bindings have non-empty metadata", func() {
-			build.Spec.Bindings = []corev1alpha1.Binding{
-				{Name: "apm", MetadataRef: &corev1.LocalObjectReference{}},
-			}
-
-			assertValidationError(build, apis.ErrMissingField("spec.bindings[0].metadataRef.name"))
-		})
-
-		it("validates bindings have non-empty secrets", func() {
-			build.Spec.Bindings = []corev1alpha1.Binding{
+			build.Spec.Services = []corev1.ObjectReference {
 				{
-					Name:        "apm",
-					MetadataRef: &corev1.LocalObjectReference{Name: "metadata"},
-					SecretRef:   &corev1.LocalObjectReference{},
+					Kind:            "Secret",
+					Name:            "&",
 				},
 			}
 
-			assertValidationError(build, apis.ErrMissingField("spec.bindings[0].secretRef.name"))
+			assertValidationError(build, apis.ErrInvalidValue("&", "spec.services[0].name"))
 		})
+
+		it("validates bindings have a kind", func() {
+			build.Spec.Services = []corev1.ObjectReference {
+				{
+					Name:            "my-ref",
+				},
+			}
+
+			assertValidationError(build, apis.ErrMissingField("spec.services[0].kind"))
+		})
+
 
 		it("validates bindings name uniqueness", func() {
-			build.Spec.Bindings = []corev1alpha1.Binding{
+			build.Spec.Services = []corev1.ObjectReference {
 				{
-					Name:        "apm",
-					MetadataRef: &corev1.LocalObjectReference{Name: "metadata"},
+					Kind:            "Secret",
+					Name:            "apm",
 				},
 				{
-					Name:        "not-apm",
-					MetadataRef: &corev1.LocalObjectReference{Name: "metadata"},
-					SecretRef:   &corev1.LocalObjectReference{Name: "secret"},
+					Kind:            "Secret",
+					Name:            "not-apm",
 				},
 				{
-					Name:        "apm",
-					MetadataRef: &corev1.LocalObjectReference{Name: "metadata"},
+					Kind:            "Secret",
+					Name:            "apm",
 				},
 			}
 
-			assertValidationError(build, apis.ErrGeneric("duplicate binding name \"apm\"", "spec.bindings[0].name", "spec.bindings[2].name"))
+			assertValidationError(build, apis.ErrGeneric("duplicate service name \"apm\"", "spec.services[0].name", "spec.services[2].name"))
+		})
+
+		it("validates v1alpha1 bindings have not been added", func() {
+			if build.Annotations == nil{
+				build.Annotations = map[string]string{}
+			}
+			build.Annotations[V1Alpha1BindingsAnnotation] = `{"name": "v1alpha1servicebinding", "metadataRef": {"name": "some-config-map"}, "secretRef": {"name": "some-secret"}}`
+
+			assertValidationError(build, apis.ErrInvalidKeyName(V1Alpha1BindingsAnnotation, "metadata.annotations"))
 		})
 
 		it("validates not registry AND volume cache are both specified", func() {

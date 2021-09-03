@@ -33,12 +33,14 @@ func testBuildConversion(t *testing.T, when spec.G, it spec.S) {
 					}},
 				},
 				ServiceAccount: "default",
+				Services:       Services{
+					{Name: "test"},
+				},
 				Cache: &BuildCacheConfig{
 					Volume: &BuildPersistentVolumeCache{
 						ClaimName: "some-claim-name",
 					},
 				},
-				Bindings: nil,
 				Env: []corev1.EnvVar{{
 					Name:  "some-var",
 					Value: "some-val",

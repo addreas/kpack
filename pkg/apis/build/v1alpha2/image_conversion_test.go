@@ -46,8 +46,8 @@ func testImageConversion(t *testing.T, when spec.G, it spec.S) {
 				FailedBuildHistoryLimit:  &buildHistoryLimit,
 				SuccessBuildHistoryLimit: &buildHistoryLimit,
 				ImageTaggingStrategy:     corev1alpha1.BuildNumber,
-				Build: &corev1alpha1.ImageBuild{
-					Bindings: corev1alpha1.Bindings{{
+				Build: &ImageBuild{
+					Services: Services{{
 						Name: "some-binding",
 					}},
 					Env: []corev1.EnvVar{

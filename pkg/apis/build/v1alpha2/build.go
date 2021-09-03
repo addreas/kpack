@@ -1,6 +1,7 @@
 package v1alpha2
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -27,8 +28,23 @@ func (b *Build) BuilderSpec() corev1alpha1.BuildBuilderSpec {
 	return b.Spec.Builder
 }
 
-func (b *Build) Bindings() []corev1alpha1.Binding {
-	return b.Spec.Bindings
+func (b *Build) Services() Services {
+	return b.Spec.Services
+}
+
+func (b *Build) V1Alpha1Bindings() (V1Alpha1Bindings, error) {
+	if b.Annotations == nil || b.Annotations[V1Alpha1BindingsAnnotation] == "" {
+		return V1Alpha1Bindings{}, nil
+	}
+
+	var bindings V1Alpha1Bindings
+	bindingJson := b.Annotations[V1Alpha1BindingsAnnotation]
+	err := json.Unmarshal([]byte(bindingJson), &bindings)
+	if err != nil {
+		return nil ,err
+	}
+
+	return bindings, nil
 }
 
 func (b *Build) IsRunning() bool {

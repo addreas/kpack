@@ -22,6 +22,8 @@ const (
 	BuildChangesAnnotation = "image.kpack.io/buildChanges"
 	BuildNeededAnnotation  = "image.kpack.io/additionalBuildNeeded"
 
+	V1Alpha1BindingsAnnotation = "kpack.io/v1alpha1Bindings"
+
 	BuildReasonConfig    = "CONFIG"
 	BuildReasonCommit    = "COMMIT"
 	BuildReasonBuildpack = "BUILDPACK"
@@ -34,7 +36,7 @@ type BuildReason string
 func (im *Image) Build(sourceResolver *SourceResolver, builder BuilderResource, latestBuild *Build, reasons, changes string, nextBuildNumber int64) *Build {
 	buildNumber := strconv.Itoa(int(nextBuildNumber))
 
-	return &Build{
+	build := &Build{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    im.Namespace,
 			GenerateName: im.generateBuildName(buildNumber),
@@ -57,7 +59,7 @@ func (im *Image) Build(sourceResolver *SourceResolver, builder BuilderResource, 
 			ServiceAccount:        im.Spec.ServiceAccount,
 			Source:                sourceResolver.SourceConfig(),
 			Cache:                 im.getBuildCacheConfig(),
-			Bindings:              im.Bindings(),
+			Services:              im.Services(),
 			Env:                   im.Env(),
 			ProjectDescriptorPath: im.Spec.ProjectDescriptorPath,
 			Resources:             im.Resources(),
@@ -65,6 +67,12 @@ func (im *Image) Build(sourceResolver *SourceResolver, builder BuilderResource, 
 			Notary:                im.Spec.Notary,
 		},
 	}
+
+	if bindings, ok := im.Annotations[V1Alpha1BindingsAnnotation]; ok {
+		build.Annotations[V1Alpha1BindingsAnnotation] = bindings
+	}
+
+	return build
 }
 
 func (is *ImageSpec) NeedVolumeCache() bool {
@@ -112,11 +120,11 @@ func (im *Image) LatestForImage(build *Build) string {
 	return im.Status.LatestImage
 }
 
-func (im *Image) Bindings() corev1alpha1.Bindings {
+func (im *Image) Services() Services {
 	if im.Spec.Build == nil {
 		return nil
 	}
-	return im.Spec.Build.Bindings
+	return im.Spec.Build.Services
 }
 
 func (im *Image) Env() []corev1.EnvVar {

@@ -52,7 +52,7 @@ type BuildSpec struct {
 	Source         corev1alpha1.SourceConfig     `json:"source"`
 	Cache          *BuildCacheConfig             `json:"cache,omitempty"`
 	// +listType
-	Bindings corev1alpha1.Bindings `json:"bindings,omitempty"`
+	Services Services `json:"services,omitempty"`
 	// +listType
 	Env                   []corev1.EnvVar             `json:"env,omitempty"`
 	ProjectDescriptorPath string                      `json:"projectDescriptorPath,omitempty"`
@@ -131,3 +131,14 @@ type BuildList struct {
 	// +k8s:listType=atomic
 	Items []Build `json:"items"`
 }
+
+// +k8s:openapi-gen=true
+// +k8s:deepcopy-gen=true
+type Services []corev1.ObjectReference
+
+type V1Alpha1Binding struct {
+	Name        string                       `json:"name,omitempty"`
+	MetadataRef *corev1.LocalObjectReference `json:"metadataRef,omitempty"`
+	SecretRef   *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+}
+type V1Alpha1Bindings []V1Alpha1Binding
